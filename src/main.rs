@@ -7,6 +7,14 @@ use serde_json;
 use clap::Parser;
 use crate::args::{Args, Command};
 
+fn decode_cmd(encoded_value: &str) -> anyhow::Result<serde_json::Value> {
+    let (value, rest) = decode_bencoded_value(encoded_value)?;
+    if rest.is_empty() {
+        Ok(value)
+    } else {
+        Err(anyhow!("still have decode str: {}", rest))
+    }
+}
 
 ///
 ///
@@ -17,10 +25,22 @@ use crate::args::{Args, Command};
 /// returns: Result of a pair (json Value, rest of input string)
 fn decode_bencoded_value(encoded_value: &str) -> anyhow::Result<(serde_json::Value, &str)> {
     let first_char = encoded_value.chars().next().context("encoded_value exhausted!")?;
+    let mut peeker = encoded_value.chars().peekable();
+    if peeker.peek().unwrap() == &'i' {}
     match first_char {
         'i' => { decode_bencoded_int(encoded_value) }
         '0'..='9' => { decode_bencoded_string(encoded_value) }
-        'l' => { todo!() }
+        'l' => {
+            let mut values = Vec::new();
+            let mut remainder = &encoded_value[1..];
+            while remainder.chars().next() != Some('e') {
+                let (value, rest) = decode_bencoded_value(remainder)?;
+                values.push(value);
+                remainder = rest;
+            }
+            let remainder = remainder.strip_prefix('e').with_context(|| format!("Can't strip prefix `e` of str: {}", remainder))?;
+            Ok((serde_json::Value::Array(values), remainder))
+        }
         'd' => { todo!() }
         _ => { Err(anyhow!("Encounter an invalid char: {}", encoded_value)) }
     }
@@ -65,7 +85,7 @@ fn main() -> anyhow::Result<()> {
     let args = Args::parse();
     match args.command {
         Command::Decode { msg } => {
-            let (decoded_value, _) = decode_bencoded_value(&msg).with_context(|| format!("Failed to decode {}", &msg))?;
+            let decoded_value = decode_cmd(&msg)?;
             println!("{}", decoded_value.to_string());
         }
     }
