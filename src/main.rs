@@ -6,7 +6,13 @@ use sha1::{
 };
 use hex;
 
-use crate::{args::{Args, Command}, torrent::*};
+use crate::{
+    args::{Args, Command},
+    torrent::{
+        Torrent,
+        Keys,
+    },
+};
 
 pub(crate) mod args;
 pub(crate) mod hashes;
@@ -38,6 +44,12 @@ fn main() -> anyhow::Result<()> {
             hasher.update(&info_encoded);
             let info_hash = hasher.finalize();
             println!("Info Hash: {}", hex::encode(&info_hash));
+            println!("Piece Length: {}", torrent.info.plength);
+            println!("Piece Hashes:");
+
+            for hash in torrent.info.pieces.0 {
+                println!("{}", hex::encode(&hash));
+            }
         }
     }
     Ok(())

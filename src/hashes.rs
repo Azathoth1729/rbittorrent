@@ -1,12 +1,12 @@
 use std::fmt::Formatter;
 use serde::de::{Error, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use serde::ser::SerializeSeq;
+
 
 const SIZE: usize = 20;
 
 #[derive(Debug, Clone)]
-pub struct Hashes(Vec<[u8; 20]>);
+pub struct Hashes(pub(crate) Vec<[u8; 20]>);
 
 struct HashStrVisitor;
 

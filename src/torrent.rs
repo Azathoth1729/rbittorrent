@@ -50,7 +50,7 @@ pub enum Keys {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct TorrentFile {
+pub struct TorrentFile {
     /// The length of the file in bytes.
     length: usize,
     /// Subdirectory names for this file, the last of which is the actual file name 
