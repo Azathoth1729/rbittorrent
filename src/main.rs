@@ -1,5 +1,10 @@
 use anyhow::Context;
 use clap::Parser;
+use sha1::{
+    Digest,
+    Sha1,
+};
+use hex;
 
 use crate::{args::{Args, Command}, torrent::*};
 
@@ -24,7 +29,15 @@ fn main() -> anyhow::Result<()> {
             println!("Tracker URL: P{}", torrent.announce);
             if let Keys::SingleFile { length } = torrent.info.keys {
                 println!("Length: {}", length)
+            } else {
+                todo!();
             }
+            let info_encoded = serde_bencode::to_bytes(&torrent.info).context("re-encode info dict")?;
+
+            let mut hasher = Sha1::new();
+            hasher.update(&info_encoded);
+            let info_hash = hasher.finalize();
+            println!("Info Hash: {}", hex::encode(&info_hash));
         }
     }
     Ok(())

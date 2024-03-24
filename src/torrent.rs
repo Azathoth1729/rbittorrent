@@ -1,15 +1,15 @@
 use serde::{Deserialize, Serialize};
 use crate::hashes;
 
-/// Metainfo files (also known as .torrent files) are bencoded dictionaries with the following keys:
-#[derive(Debug, Clone, Deserialize)]
+/// Metainfo files (also known as .torrent files) are bencoded dictionaries
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Torrent {
     /// The URL of the tracker.
     pub announce: String,
     pub info: Info,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Info {
     /// The suggested name to save the file (or directory) as. It is purely advisory.
     ///
@@ -32,7 +32,7 @@ pub struct Info {
 }
 
 /// There is a key `length` or a key `files`, but not both or neither.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum Keys {
     /// If `length` is present then the download represents a single file
@@ -49,7 +49,7 @@ pub enum Keys {
     },
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct TorrentFile {
     /// The length of the file in bytes.
     length: usize,
