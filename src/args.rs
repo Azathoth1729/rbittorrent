@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use clap::{Parser, Subcommand};
 
 /// Simple program to greet a person
@@ -12,5 +13,8 @@ pub struct Args {
 pub enum Command {
     Decode {
         msg: String,
-    }
+    },
+    Info {
+        path: PathBuf
+    },
 }
