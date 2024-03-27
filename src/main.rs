@@ -1,13 +1,12 @@
 use anyhow::Context;
 use clap::Parser;
 use hex;
-use std::fmt::format;
 
-use crate::tracker::TrackerResponse;
 use crate::{
     args::{Args, Command},
     torrent::{Keys, Torrent},
     tracker::TrackerRequest,
+    tracker::TrackerResponse,
 };
 
 pub(crate) mod args;
@@ -16,7 +15,8 @@ pub(crate) mod hashes;
 pub(crate) mod torrent;
 pub(crate) mod tracker;
 
-// Usage: your_bittorrent.sh decode "<encoded_value>"
+const PEER_ID: &str = "00112233445566778899";
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
@@ -55,7 +55,6 @@ async fn main() -> anyhow::Result<()> {
             let torrent: Torrent =
                 serde_bencode::from_bytes(&torrent_f).context("parse torrent file")?;
             let info_hash = torrent.info_hash()?;
-            println!("info_hash: {:?}", &info_hash);
 
             let length = if let Keys::SingleFile { length } = torrent.info.keys {
                 length
@@ -64,7 +63,7 @@ async fn main() -> anyhow::Result<()> {
             };
             let request = TrackerRequest {
                 info_hash,
-                peer_id: String::from("00112233445566778899"),
+                peer_id: String::from(PEER_ID),
                 port: 6881,
                 uploaded: 0,
                 downloaded: 0,
@@ -81,7 +80,7 @@ async fn main() -> anyhow::Result<()> {
             url_params.push_str(format!("&info_hash=%{}", hexed_info_hash_str).as_str());
 
             tracker_url.set_query(Some(&url_params));
-            println!("url with params: {}", tracker_url);
+            eprintln!("url with params:\n{}", tracker_url);
 
             let response = reqwest::get(tracker_url).await.context("fetch tracker")?;
 
