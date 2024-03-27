@@ -20,6 +20,7 @@ impl Torrent {
         Ok(hasher.finalize().into())
     }
 }
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Info {
     /// The suggested name to save the file (or directory) as. It is purely advisory.
@@ -56,6 +57,17 @@ pub enum Keys {
     /// For the purposes of the other keys in `Info`, the multi-file case is treated as only having
     /// a single file by concatenating the files in the order they appear in the files list.
     MultiFile { files: Vec<TorrentFile> },
+}
+
+impl Keys {
+    pub fn length(&self) -> usize {
+        match self {
+            Keys::SingleFile { length } => *length,
+            Keys::MultiFile { .. } => {
+                todo!()
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

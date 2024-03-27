@@ -1,10 +1,12 @@
 use anyhow::Context;
 use clap::Parser;
 use hex;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 use crate::{
     args::{Args, Command},
-    torrent::{Keys, Torrent},
+    peer::Handshake,
+    torrent::Torrent,
     tracker::TrackerRequest,
     tracker::TrackerResponse,
 };
@@ -17,6 +19,7 @@ pub(crate) mod torrent;
 pub(crate) mod tracker;
 
 const PEER_ID: &str = "00112233445566778899";
+const PEER_ID_BYTES: [u8; 20] = *b"00112233445566778899";
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -32,18 +35,9 @@ async fn main() -> anyhow::Result<()> {
                 serde_bencode::from_bytes(&torrent_f).context("parse torrent file")?;
 
             eprintln!("{torrent:?}");
-            println!("Tracker URL: P{}", torrent.announce);
-
-            let length = if let Keys::SingleFile { length } = torrent.info.keys {
-                length
-            } else {
-                todo!();
-            };
-
-            println!("Length: {}", length);
-
-            let info_hash = torrent.info_hash()?;
-            println!("Info Hash: {}", hex::encode(&info_hash));
+            println!("Tracker URL: {}", torrent.announce);
+            println!("Length: {}", torrent.info.keys.length());
+            println!("Info Hash: {}", hex::encode(torrent.info_hash()?));
             println!("Piece Length: {}", torrent.info.plength);
             println!("Piece Hashes:");
 
@@ -55,20 +49,14 @@ async fn main() -> anyhow::Result<()> {
             let torrent_f = std::fs::read(path).context("read torrent file")?;
             let torrent: Torrent =
                 serde_bencode::from_bytes(&torrent_f).context("parse torrent file")?;
-            let info_hash = torrent.info_hash()?;
 
-            let length = if let Keys::SingleFile { length } = torrent.info.keys {
-                length
-            } else {
-                todo!();
-            };
             let request = TrackerRequest {
-                info_hash,
+                info_hash: torrent.info_hash()?,
                 peer_id: String::from(PEER_ID),
                 port: 6881,
                 uploaded: 0,
                 downloaded: 0,
-                left: length,
+                left: torrent.info.keys.length(),
                 compact: 1,
             };
             let mut tracker_url =
@@ -91,6 +79,36 @@ async fn main() -> anyhow::Result<()> {
             for peer in response.peers.0 {
                 println!("{}", peer);
             }
+        }
+        Command::Handshake { path, peer_ip } => {
+            println!("peer_ip: {}", peer_ip);
+
+            let torrent_f = std::fs::read(path).context("read torrent file")?;
+            let torrent: Torrent =
+                serde_bencode::from_bytes(&torrent_f).context("parse torrent file")?;
+            let info_hash = torrent.info_hash()?;
+
+            let mut peer_stream = tokio::net::TcpStream::connect(peer_ip)
+                .await
+                .with_context(|| format!("connect to peer: {}", peer_ip))?;
+
+            let mut handshake = Handshake::new(info_hash, PEER_ID_BYTES);
+            {
+                let handshake_bytes = handshake.as_bytes_mut();
+                peer_stream
+                    .write_all(handshake_bytes)
+                    .await
+                    .context("write handshake")?;
+                peer_stream
+                    .read_exact(handshake_bytes)
+                    .await
+                    .context("read handshake")?;
+            }
+            assert_eq!(handshake.length, 19);
+            assert_eq!(handshake.bittorrent, *b"BitTorrent protocol");
+            assert_eq!(handshake.info_hash, info_hash);
+
+            println!("Peer ID: {}", hex::encode(handshake.peer_id));
         }
     }
     Ok(())

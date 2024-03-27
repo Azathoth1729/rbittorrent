@@ -3,6 +3,44 @@ use serde::{Deserialize, Serialize, Serializer};
 use std::fmt::Formatter;
 use std::net::{Ipv4Addr, SocketAddrV4};
 
+#[repr(C)]
+#[derive(Debug, PartialEq)]
+pub struct Handshake {
+    /// length of the protocol string (BitTorrent protocol) which is 19 (1 byte)
+    pub length: u8,
+    /// the string BitTorrent protocol (19 bytes)
+    pub bittorrent: [u8; 19],
+    /// eight reserved bytes, which are all set to zero (8 bytes)
+    pub reserved: [u8; 8],
+    /// sha1 info_hash (20 bytes) (NOT the hexadecimal representation, which is 40 bytes long)
+    pub info_hash: [u8; 20],
+    /// peer id (20 bytes)
+    pub peer_id: [u8; 20],
+}
+
+impl Handshake {
+    pub fn new(info_hash: [u8; 20], peer_id: [u8; 20]) -> Self {
+        Self {
+            length: 19,
+            bittorrent: *b"BitTorrent protocol",
+            reserved: [0; 8],
+            info_hash,
+            peer_id,
+        }
+    }
+    #[allow(dead_code)]
+    pub fn as_bytes(&self) -> &[u8; std::mem::size_of::<Handshake>()] {
+        let handshake_bytes =
+            self as *const Handshake as *const [u8; std::mem::size_of::<Handshake>()];
+        unsafe { &*handshake_bytes }
+    }
+    pub fn as_bytes_mut(&mut self) -> &mut [u8; std::mem::size_of::<Handshake>()] {
+        let handshake_bytes = self as *mut Handshake as *mut [u8; std::mem::size_of::<Handshake>()];
+        // Safety: Handshake is a POD with repr(c)
+        unsafe { &mut *handshake_bytes }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Peers(pub Vec<SocketAddrV4>);
 
