@@ -1,5 +1,5 @@
-use std::path::PathBuf;
 use clap::{Parser, Subcommand};
+use std::path::PathBuf;
 
 /// Simple program to greet a person
 #[derive(Parser, Debug)]
@@ -11,10 +11,7 @@ pub struct Args {
 
 #[derive(Debug, Subcommand)]
 pub enum Command {
-    Decode {
-        msg: String,
-    },
-    Info {
-        path: PathBuf
-    },
+    Decode { msg: String },
+    Info { path: PathBuf },
+    Peers { path: PathBuf },
 }

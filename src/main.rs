@@ -1,26 +1,24 @@
 use anyhow::Context;
 use clap::Parser;
-use sha1::{
-    Digest,
-    Sha1,
-};
 use hex;
+use std::fmt::format;
 
+use crate::tracker::TrackerResponse;
 use crate::{
     args::{Args, Command},
-    torrent::{
-        Torrent,
-        Keys,
-    },
+    torrent::{Keys, Torrent},
+    tracker::TrackerRequest,
 };
 
 pub(crate) mod args;
+pub(crate) mod de;
 pub(crate) mod hashes;
 pub(crate) mod torrent;
-pub(crate) mod de;
+pub(crate) mod tracker;
 
 // Usage: your_bittorrent.sh decode "<encoded_value>"
-fn main() -> anyhow::Result<()> {
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
     match args.command {
         Command::Decode { msg } => {
@@ -29,26 +27,69 @@ fn main() -> anyhow::Result<()> {
         }
         Command::Info { path } => {
             let torrent_f = std::fs::read(path).context("read torrent file")?;
-            let torrent: Torrent = serde_bencode::from_bytes(&torrent_f).context("parse torrent file")?;
+            let torrent: Torrent =
+                serde_bencode::from_bytes(&torrent_f).context("parse torrent file")?;
 
             eprintln!("{torrent:?}");
             println!("Tracker URL: P{}", torrent.announce);
-            if let Keys::SingleFile { length } = torrent.info.keys {
-                println!("Length: {}", length)
+
+            let length = if let Keys::SingleFile { length } = torrent.info.keys {
+                length
             } else {
                 todo!();
-            }
-            let info_encoded = serde_bencode::to_bytes(&torrent.info).context("re-encode info dict")?;
+            };
 
-            let mut hasher = Sha1::new();
-            hasher.update(&info_encoded);
-            let info_hash = hasher.finalize();
+            println!("Length: {}", length);
+
+            let info_hash = torrent.info_hash()?;
             println!("Info Hash: {}", hex::encode(&info_hash));
             println!("Piece Length: {}", torrent.info.plength);
             println!("Piece Hashes:");
 
             for hash in torrent.info.pieces.0 {
                 println!("{}", hex::encode(&hash));
+            }
+        }
+        Command::Peers { path } => {
+            let torrent_f = std::fs::read(path).context("read torrent file")?;
+            let torrent: Torrent =
+                serde_bencode::from_bytes(&torrent_f).context("parse torrent file")?;
+            let info_hash = torrent.info_hash()?;
+            println!("info_hash: {:?}", &info_hash);
+
+            let length = if let Keys::SingleFile { length } = torrent.info.keys {
+                length
+            } else {
+                todo!();
+            };
+            let request = TrackerRequest {
+                info_hash,
+                peer_id: String::from("00112233445566778899"),
+                port: 6881,
+                uploaded: 0,
+                downloaded: 0,
+                left: length,
+                compact: 1,
+            };
+            let mut tracker_url =
+                reqwest::Url::parse(&torrent.announce).context("parse tracker announce url")?;
+            let mut url_params =
+                serde_urlencoded::to_string(&request).context("url-encode tracker parameters")?;
+
+            let hexed_info_hash_str = &request.info_hash.map(|byte| hex::encode(&[byte])).join("%");
+
+            url_params.push_str(format!("&info_hash=%{}", hexed_info_hash_str).as_str());
+
+            tracker_url.set_query(Some(&url_params));
+            println!("url with params: {}", tracker_url);
+
+            let response = reqwest::get(tracker_url).await.context("fetch tracker")?;
+
+            let response = response.bytes().await.context("fetch tracker response")?;
+            let response: TrackerResponse =
+                serde_bencode::from_bytes(&response).context("parse tracker response")?;
+            for peer in response.peers.0 {
+                println!("{}", peer);
             }
         }
     }

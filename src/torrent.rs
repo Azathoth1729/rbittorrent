@@ -1,5 +1,7 @@
-use serde::{Deserialize, Serialize};
 use crate::hashes;
+use anyhow::Context;
+use serde::{Deserialize, Serialize};
+use sha1::{Digest, Sha1};
 
 /// Metainfo files (also known as .torrent files) are bencoded dictionaries
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -9,11 +11,20 @@ pub struct Torrent {
     pub info: Info,
 }
 
+impl Torrent {
+    pub fn info_hash(&self) -> anyhow::Result<[u8; 20]> {
+        let info_encoded = serde_bencode::to_bytes(&self.info).context("re-encode info dict")?;
+
+        let mut hasher = Sha1::new();
+        hasher.update(&info_encoded);
+        Ok(hasher.finalize().into())
+    }
+}
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Info {
     /// The suggested name to save the file (or directory) as. It is purely advisory.
     ///
-    /// In the single file case, the name key is the name of a file, 
+    /// In the single file case, the name key is the name of a file,
     /// In the multiple file case, it's the name of a directory.
     pub name: String,
 
@@ -44,16 +55,14 @@ pub enum Keys {
     ///
     /// For the purposes of the other keys in `Info`, the multi-file case is treated as only having
     /// a single file by concatenating the files in the order they appear in the files list.
-    MultiFile {
-        files: Vec<TorrentFile>,
-    },
+    MultiFile { files: Vec<TorrentFile> },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TorrentFile {
     /// The length of the file in bytes.
     length: usize,
-    /// Subdirectory names for this file, the last of which is the actual file name 
+    /// Subdirectory names for this file, the last of which is the actual file name
     /// (a zero length list is an error case).
     path: Vec<String>,
 }
