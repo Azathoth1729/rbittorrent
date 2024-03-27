@@ -12,6 +12,7 @@ use crate::{
 pub(crate) mod args;
 pub(crate) mod de;
 pub(crate) mod hashes;
+pub(crate) mod peer;
 pub(crate) mod torrent;
 pub(crate) mod tracker;
 
