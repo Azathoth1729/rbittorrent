@@ -11,8 +11,6 @@ pub fn decode_cmd(encoded_value: &str) -> anyhow::Result<BencodeValue> {
     }
 }
 
-///
-///
 /// # Arguments
 ///
 /// * `encoded_value`: bencoded string, may be very long
